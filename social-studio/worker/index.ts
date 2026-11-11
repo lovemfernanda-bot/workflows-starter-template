@@ -1,5 +1,7 @@
 import { authenticate } from "./access";
-import { handleApi, type Env } from "./api";
+import "./api";
+import "./tables";
+import { handleApi, type Env } from "./http";
 
 export default {
 	async fetch(req: Request, env: Env): Promise<Response> {

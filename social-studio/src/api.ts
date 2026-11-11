@@ -1,4 +1,5 @@
 import type { Network, Status } from "../shared/rules";
+import type { ColType, Option } from "../shared/tables";
 
 export interface Brand {
 	id: string;
@@ -41,6 +42,39 @@ export interface Post {
 export interface Settings {
 	timezone: string;
 	week_start: "sunday" | "monday";
+}
+
+export interface TableSummary {
+	id: string;
+	brand_id: string | null;
+	name: string;
+	row_count: number;
+	updated_at: string;
+	deleted_at: string | null;
+}
+export interface Column {
+	id: string;
+	table_id: string;
+	name: string;
+	type: ColType;
+	options: Option[];
+	position: number;
+}
+export interface DataRow {
+	id: string;
+	table_id: string;
+	position: number;
+	data: Record<string, unknown>;
+}
+export interface TableFull {
+	table: TableSummary;
+	columns: Column[];
+	rows: DataRow[];
+}
+export interface ColumnInput {
+	name: string;
+	type: ColType;
+	options: Option[];
 }
 
 export class ApiError extends Error {}
@@ -88,6 +122,21 @@ export const api = {
 		id: string,
 		b: { copy: string; hashtags: string; publish_at: string | null; published_url?: string },
 	) => call<Version>("PATCH", `/versions/${id}`, b),
+	tables: () => call<TableSummary[]>("GET", "/tables"),
+	trashedTables: () => call<TableSummary[]>("GET", "/tables?deleted=1"),
+	createTable: (b: { name: string; brand_id: string | null }) => call<TableSummary>("POST", "/tables", b),
+	table: (id: string) => call<TableFull>("GET", `/tables/${id}`),
+	updateTable: (id: string, b: { name?: string; brand_id?: string | null }) => call<TableSummary>("PATCH", `/tables/${id}`, b),
+	deleteTable: (id: string) => call<{ ok: true }>("DELETE", `/tables/${id}`),
+	restoreTable: (id: string) => call<TableSummary>("POST", `/tables/${id}/restore`),
+	deleteTableForever: (id: string) => call<{ ok: true }>("DELETE", `/tables/${id}?permanent=1`),
+	addColumn: (tableId: string, c: ColumnInput) => call<Column>("POST", `/tables/${tableId}/columns`, c),
+	updateColumn: (id: string, c: { name?: string; options?: Option[] }) => call<Column>("PATCH", `/columns/${id}`, c),
+	deleteColumn: (id: string) => call<{ ok: true }>("DELETE", `/columns/${id}`),
+	reorderColumns: (tableId: string, ids: string[]) => call<Column[]>("PUT", `/tables/${tableId}/columns/order`, { ids }),
+	addRow: (tableId: string, data?: Record<string, unknown>) => call<DataRow>("POST", `/tables/${tableId}/rows`, { data }),
+	updateRow: (id: string, data: Record<string, unknown>) => call<DataRow>("PATCH", `/rows/${id}`, { data }),
+	deleteRow: (id: string) => call<{ ok: true }>("DELETE", `/rows/${id}`),
 	transition: (id: string, to: Status, note?: string, published_url?: string) =>
 		call<Version>("POST", `/versions/${id}/transition`, { to, note, published_url }),
 };

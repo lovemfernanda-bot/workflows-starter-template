@@ -6,12 +6,14 @@ import Board from "./components/Board";
 import Brands from "./components/Brands";
 import PostEditor from "./components/PostEditor";
 import Settings from "./components/Settings";
+import Tables from "./components/Tables";
 import { todayIn, type Item } from "./ui";
 
-type View = "calendario" | "contenido" | "marcas" | "ajustes";
+type View = "calendario" | "contenido" | "tablas" | "marcas" | "ajustes";
 const VIEWS: { id: View; label: string }[] = [
 	{ id: "calendario", label: "Calendario" },
 	{ id: "contenido", label: "Contenido" },
+	{ id: "tablas", label: "Tablas" },
 	{ id: "marcas", label: "Marcas" },
 	{ id: "ajustes", label: "Ajustes" },
 ];
@@ -189,6 +191,7 @@ export default function App() {
 					/>
 				)}
 				{!loading && view === "contenido" && <Board items={items} brands={brandMap} onOpen={(id) => setEditor({ postId: id })} />}
+				{!loading && view === "tablas" && <Tables brands={brands} brandId={brandId} />}
 				{!loading && view === "marcas" && <Brands brands={brands} onChanged={() => void load()} />}
 				{!loading && view === "ajustes" && (
 					<Settings settings={settings} brands={brands} onSettings={setSettings} onChanged={() => void load()} />

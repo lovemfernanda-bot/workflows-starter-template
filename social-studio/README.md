@@ -18,12 +18,18 @@ Vive en esta carpeta, con su propio `package.json`, separada de la plantilla de 
   - No se puede aprobar sin pasar por revisión, ni programar sin fecha, ni pedir cambios sin nota.
   - Si cambias el texto de una versión aprobada, vuelve a borrador.
 - Historial de cada cambio de estado; botón "Copiar texto y abrir [red]".
-- **Papelera:** "Mover a la papelera" es reversible; se restaura o se elimina para siempre desde Ajustes.
+- **Tablas personalizadas (estilo Monday/Notion):** crea tablas por marca (o generales) y agrega tus propias columnas.
+  - Tipos de columna: texto, número, selección (con colores), selección múltiple, fecha, casilla y enlace.
+  - Editas las celdas directamente; puedes renombrar, reordenar y eliminar columnas, ordenar por una columna y buscar.
+  - Límites: 100 tablas, 30 columnas por tabla, 1000 filas por tabla.
+  - El tipo de una columna no se puede cambiar después (se crea otra columna). Quitar una opción la borra de las filas que la usaban.
+- **Papelera:** "Mover a la papelera" es reversible (publicaciones y tablas); se restaura o se elimina para siempre desde Ajustes.
 - **Ajustes:** zona horaria (por defecto America/New_York) y primer día de la semana (por defecto domingo).
 - Respaldo: `GET /api/v1/export` (JSON), también desde Ajustes.
 
 **Fuera del prototipo:** biblioteca de enlaces, perfil completo de marca (audiencia, tono, pilares, referencias),
-buscador, vista de lista, arrastrar para reprogramar, roles, publicación automática, métricas
+buscador de publicaciones, vista de lista, arrastrar para reprogramar, filtros y fórmulas en las tablas,
+vincular filas de una tabla con publicaciones, importar/exportar CSV, roles, publicación automática, métricas
 (incluidas las "mejores horas", que necesitan conectar las redes).
 
 ## Probarlo en tu computadora

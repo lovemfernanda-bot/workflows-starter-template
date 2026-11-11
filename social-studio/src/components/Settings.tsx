@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { api, type Brand, type Post, type Settings as SettingsT } from "../api";
+import { api, type Brand, type Post, type Settings as SettingsT, type TableSummary } from "../api";
 import { formatStamp } from "../ui";
 
 const ZONES = [
@@ -31,6 +31,7 @@ interface Props {
 
 export default function Settings({ settings, brands, onSettings, onChanged }: Props) {
 	const [trash, setTrash] = useState<Post[] | null>(null);
+	const [trashTables, setTrashTables] = useState<TableSummary[]>([]);
 	const [err, setErr] = useState("");
 	const [saved, setSaved] = useState("");
 	const brandName = (id: string) => brands.find((b) => b.id === id)?.name ?? "";
@@ -38,7 +39,9 @@ export default function Settings({ settings, brands, onSettings, onChanged }: Pr
 
 	const loadTrash = useCallback(async () => {
 		try {
-			setTrash(await api.trashedPosts());
+			const [posts, tables] = await Promise.all([api.trashedPosts(), api.trashedTables()]);
+			setTrash(posts);
+			setTrashTables(tables);
 		} catch (e) {
 			setErr((e as Error).message);
 		}
@@ -104,9 +107,9 @@ export default function Settings({ settings, brands, onSettings, onChanged }: Pr
 			</div>
 
 			<div className="panel">
-				<h3>Papelera{trash ? ` (${trash.length})` : ""}</h3>
+				<h3>Papelera{trash ? ` (${trash.length + trashTables.length})` : ""}</h3>
 				<p className="muted">Las publicaciones que mueves aquí se pueden restaurar. Al eliminarlas desde aquí se borran para siempre.</p>
-				{trash && trash.length === 0 && <p className="empty">La papelera está vacía.</p>}
+				{trash && trash.length === 0 && trashTables.length === 0 && <p className="empty">La papelera está vacía.</p>}
 				{trash?.map((p) => (
 					<div key={p.id} className="trash-row">
 						<div>
@@ -124,6 +127,30 @@ export default function Settings({ settings, brands, onSettings, onChanged }: Pr
 								className="btn btn-danger"
 								onClick={() => {
 									if (window.confirm(`¿Eliminar "${p.title}" para siempre? No se puede deshacer.`)) void act(() => api.deletePostForever(p.id));
+								}}
+							>
+								Eliminar para siempre
+							</button>
+						</div>
+					</div>
+				))}
+				{trashTables.map((t) => (
+					<div key={t.id} className="trash-row">
+						<div>
+							<strong>{t.name}</strong> <span className="muted">(tabla)</span>
+							<div className="muted">
+								{brandName(t.brand_id ?? "") || "General"} · {t.row_count} {t.row_count === 1 ? "fila" : "filas"}
+								{t.deleted_at ? ` · en la papelera desde ${formatStamp(t.deleted_at)}` : ""}
+							</div>
+						</div>
+						<div className="trash-actions">
+							<button className="btn btn-secondary" onClick={() => void act(() => api.restoreTable(t.id))}>
+								Restaurar
+							</button>
+							<button
+								className="btn btn-danger"
+								onClick={() => {
+									if (window.confirm(`¿Eliminar la tabla "${t.name}" para siempre? No se puede deshacer.`)) void act(() => api.deleteTableForever(t.id));
 								}}
 							>
 								Eliminar para siempre
