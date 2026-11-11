@@ -1,6 +1,6 @@
 // Reglas del flujo compartidas por la API (Worker) y la interfaz.
 
-export const NETWORKS = ["instagram", "facebook", "tiktok", "linkedin"] as const;
+export const NETWORKS = ["instagram", "facebook", "tiktok", "linkedin", "youtube"] as const;
 export type Network = (typeof NETWORKS)[number];
 
 export const NETWORK_LABEL: Record<Network, string> = {
@@ -8,6 +8,7 @@ export const NETWORK_LABEL: Record<Network, string> = {
 	facebook: "Facebook",
 	tiktok: "TikTok",
 	linkedin: "LinkedIn",
+	youtube: "YouTube",
 };
 
 export const STATUSES = [

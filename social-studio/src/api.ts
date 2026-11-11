@@ -34,8 +34,13 @@ export interface Post {
 	pillar: string;
 	created_at: string;
 	updated_at: string;
+	deleted_at: string | null;
 	status: Status | null;
 	versions: Version[];
+}
+export interface Settings {
+	timezone: string;
+	week_start: "sunday" | "monday";
 }
 
 export class ApiError extends Error {}
@@ -62,6 +67,11 @@ export const api = {
 	updateBrand: (id: string, b: { name: string; color: string; networks: Network[] }) =>
 		call<Brand>("PATCH", `/brands/${id}`, b),
 	posts: () => call<Post[]>("GET", "/posts"),
+	trashedPosts: () => call<Post[]>("GET", "/posts?deleted=1"),
+	settings: () => call<Settings>("GET", "/settings"),
+	saveSettings: (s: Partial<Settings>) => call<Settings>("PUT", "/settings", s),
+	restorePost: (id: string) => call<Post>("POST", `/posts/${id}/restore`),
+	deletePostForever: (id: string) => call<{ ok: true }>("DELETE", `/posts/${id}?permanent=1`),
 	post: (id: string) => call<Post>("GET", `/posts/${id}`),
 	createPost: (b: {
 		brand_id: string;

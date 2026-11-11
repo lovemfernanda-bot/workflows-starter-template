@@ -1,17 +1,19 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { api, type Brand, type Post } from "./api";
+import { api, type Brand, type Post, type Settings as SettingsT } from "./api";
 import { NETWORKS, NETWORK_LABEL, STATUSES, STATUS_LABEL, type Network, type Status } from "../shared/rules";
 import Calendar from "./components/Calendar";
 import Board from "./components/Board";
 import Brands from "./components/Brands";
 import PostEditor from "./components/PostEditor";
-import type { Item } from "./ui";
+import Settings from "./components/Settings";
+import { todayIn, type Item } from "./ui";
 
-type View = "calendario" | "contenido" | "marcas";
+type View = "calendario" | "contenido" | "marcas" | "ajustes";
 const VIEWS: { id: View; label: string }[] = [
 	{ id: "calendario", label: "Calendario" },
 	{ id: "contenido", label: "Contenido" },
 	{ id: "marcas", label: "Marcas" },
+	{ id: "ajustes", label: "Ajustes" },
 ];
 
 const read = (k: string) => {
@@ -36,13 +38,14 @@ const viewFromHash = (): View => {
 export default function App() {
 	const [brands, setBrands] = useState<Brand[]>([]);
 	const [posts, setPosts] = useState<Post[]>([]);
+	const [settings, setSettings] = useState<SettingsT>({ timezone: "America/New_York", week_start: "sunday" });
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState("");
 	const [brandId, setBrandId] = useState(() => read("studio.brand") ?? "all");
 	const [network, setNetwork] = useState<Network | "all">("all");
 	const [status, setStatus] = useState<Status | "all">("all");
 	const [view, setViewState] = useState<View>(viewFromHash);
-	const [editor, setEditor] = useState<{ postId: string | null; date?: string } | null>(null);
+	const [editor, setEditor] = useState<{ postId: string | null; dateTime?: string } | null>(null);
 
 	const setView = (v: View) => {
 		location.hash = `/${v}`;
@@ -56,9 +59,10 @@ export default function App() {
 
 	const load = useCallback(async () => {
 		try {
-			const [b, p] = await Promise.all([api.brands(), api.posts()]);
+			const [b, p, s] = await Promise.all([api.brands(), api.posts(), api.settings()]);
 			setBrands(b);
 			setPosts(p);
+			setSettings(s);
 			setError("");
 			setBrandId((cur) => (cur === "all" || b.some((x) => x.id === cur) ? cur : "all"));
 		} catch (e) {
@@ -142,7 +146,7 @@ export default function App() {
 				)}
 				{loading && <p className="muted">Cargando tu espacio…</p>}
 
-				{!loading && view !== "marcas" && (
+				{!loading && (view === "calendario" || view === "contenido") && (
 					<div className="filters" aria-label="Filtros">
 						<label>
 							<span className="sr-only">Red social</span>
@@ -179,13 +183,18 @@ export default function App() {
 						items={items}
 						brands={brandMap}
 						onOpen={(id) => setEditor({ postId: id })}
-						onNew={(date) => setEditor({ postId: null, date })}
+						onNew={(dateTime) => setEditor({ postId: null, dateTime })}
+						today={todayIn(settings.timezone)}
+						weekStart={settings.week_start}
 					/>
 				)}
 				{!loading && view === "contenido" && <Board items={items} brands={brandMap} onOpen={(id) => setEditor({ postId: id })} />}
 				{!loading && view === "marcas" && <Brands brands={brands} onChanged={() => void load()} />}
+				{!loading && view === "ajustes" && (
+					<Settings settings={settings} brands={brands} onSettings={setSettings} onChanged={() => void load()} />
+				)}
 
-				{!loading && !error && posts.length === 0 && view !== "marcas" && (
+				{!loading && !error && posts.length === 0 && (view === "calendario" || view === "contenido") && (
 					<p className="empty">Aún no hay publicaciones. Crea tu primera idea con “+ Nueva publicación”.</p>
 				)}
 			</main>
@@ -203,7 +212,8 @@ export default function App() {
 					key={editor.postId ?? "new"}
 					postId={editor.postId}
 					defaultBrandId={brandId}
-					defaultDate={editor.date}
+					defaultDateTime={editor.dateTime}
+					timezone={settings.timezone}
 					brands={brands}
 					onClose={() => setEditor(null)}
 					onChanged={() => void load()}

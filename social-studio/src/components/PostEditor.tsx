@@ -18,6 +18,7 @@ const NETWORK_URL: Record<Network, string> = {
 	facebook: "https://business.facebook.com/latest/composer",
 	tiktok: "https://www.tiktok.com/tiktokstudio/upload",
 	linkedin: "https://www.linkedin.com/feed/",
+	youtube: "https://studio.youtube.com/",
 };
 
 function transitionLabel(from: Status, to: Status): string {
@@ -35,7 +36,8 @@ const isForward = (from: Status, to: Status) =>
 interface Props {
 	postId: string | null;
 	defaultBrandId: string;
-	defaultDate?: string;
+	defaultDateTime?: string;
+	timezone: string;
 	brands: Brand[];
 	onClose: () => void;
 	onChanged: () => void;
@@ -69,7 +71,7 @@ function Header({ title, onClose }: { title: string; onClose: () => void }) {
 	);
 }
 
-function CreatePost({ defaultBrandId, defaultDate, brands, onClose, onChanged, onOpen }: Props) {
+function CreatePost({ defaultBrandId, defaultDateTime, timezone, brands, onClose, onChanged, onOpen }: Props) {
 	const firstBrand = brands.find((b) => b.id === defaultBrandId) ?? brands[0];
 	const [brandId, setBrandId] = useState(firstBrand?.id ?? "");
 	const brand = brands.find((b) => b.id === brandId);
@@ -77,7 +79,7 @@ function CreatePost({ defaultBrandId, defaultDate, brands, onClose, onChanged, o
 	const [idea, setIdea] = useState("");
 	const [pillar, setPillar] = useState("");
 	const [networks, setNetworks] = useState<Network[]>(firstBrand?.networks ?? []);
-	const [date, setDate] = useState(defaultDate ? `${defaultDate}T09:00` : "");
+	const [date, setDate] = useState(defaultDateTime ?? "");
 	const [err, setErr] = useState("");
 	const [busy, setBusy] = useState(false);
 
@@ -141,7 +143,7 @@ function CreatePost({ defaultBrandId, defaultDate, brands, onClose, onChanged, o
 					))}
 				</fieldset>
 				<label className="field">
-					<span>Fecha y hora tentativa (opcional)</span>
+					<span>Fecha y hora tentativa (opcional) · hora de {timezone}</span>
 					<input type="datetime-local" value={date} onChange={(e) => setDate(e.target.value)} />
 				</label>
 				{brand && (
@@ -174,7 +176,7 @@ interface Draft {
 }
 const draftOf = (v: Version): Draft => ({ copy: v.copy, hashtags: v.hashtags, publish_at: v.publish_at ?? "" });
 
-function EditPost({ postId, brands, onClose, onChanged }: Props & { postId: string }) {
+function EditPost({ postId, brands, timezone, onClose, onChanged }: Props & { postId: string }) {
 	const [post, setPost] = useState<Post | null>(null);
 	const [info, setInfo] = useState({ title: "", idea: "", pillar: "" });
 	const [drafts, setDrafts] = useState<Record<string, Draft>>({});
@@ -276,14 +278,12 @@ function EditPost({ postId, brands, onClose, onChanged }: Props & { postId: stri
 		}
 		window.open(NETWORK_URL[v.network], "_blank", "noopener");
 	};
-	const remove = () => {
-		if (!window.confirm(`¿Eliminar "${post.title}" y todas sus versiones? No se puede deshacer.`)) return;
+	const trash = () =>
 		void run(async () => {
 			await api.deletePost(post.id);
 			onChanged();
 			onClose();
 		});
-	};
 
 	return (
 		<>
@@ -383,7 +383,7 @@ function EditPost({ postId, brands, onClose, onChanged }: Props & { postId: stri
 							/>
 						</label>
 						<label className="field">
-							<span>Fecha y hora</span>
+							<span>Fecha y hora · hora de {timezone}</span>
 							<input
 								type="datetime-local"
 								value={d.publish_at}
@@ -485,8 +485,8 @@ function EditPost({ postId, brands, onClose, onChanged }: Props & { postId: stri
 				</div>
 			</div>
 			<div className="sheet-foot">
-				<button className="btn btn-danger" onClick={remove} disabled={busy}>
-					Eliminar
+				<button className="btn btn-danger" onClick={trash} disabled={busy}>
+					Mover a la papelera
 				</button>
 				<button className="btn btn-ghost" onClick={onClose}>
 					Cerrar

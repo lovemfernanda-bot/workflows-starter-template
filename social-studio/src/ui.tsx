@@ -6,7 +6,7 @@ export interface Item {
 	v: Version;
 }
 
-const SHORT: Record<Network, string> = { instagram: "IG", facebook: "FB", tiktok: "TT", linkedin: "in" };
+const SHORT: Record<Network, string> = { instagram: "IG", facebook: "FB", tiktok: "TT", linkedin: "in", youtube: "YT" };
 
 export function StatusChip({ status }: { status: Status | null }) {
 	if (!status) return null;
@@ -59,6 +59,15 @@ export function ItemCard({
 			</span>
 		</button>
 	);
+}
+
+/** Fecha de hoy (YYYY-MM-DD) en la zona horaria elegida. */
+export function todayIn(timeZone: string): string {
+	try {
+		return new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+	} catch {
+		return new Date().toISOString().slice(0, 10);
+	}
 }
 
 export const pad = (n: number) => String(n).padStart(2, "0");

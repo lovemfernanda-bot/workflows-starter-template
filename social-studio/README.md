@@ -9,17 +9,22 @@ Vive en esta carpeta, con su propio `package.json`, separada de la plantilla de 
 ## Qué incluye el prototipo
 
 - Marcas (BranCode, Ana Laura Sanchez) con color y redes; cambio de marca sin mezclar datos.
-- Calendario mensual (lista por días en teléfono) con filtros de marca, red y estado.
+- Cinco redes: Instagram, Facebook, TikTok, LinkedIn y YouTube.
+- Calendario **mensual y semanal por horas** (lista por días en teléfono) con filtros de marca, red y estado.
+  Desde cualquier día u hora se puede crear una publicación con esa fecha ya puesta.
 - Tablero de contenido por estado.
 - Editor con una versión por red (Instagram, Facebook, TikTok, LinkedIn): texto, hashtags, fecha y estado propios.
 - Flujo: idea → borrador → en revisión → (cambios solicitados) → aprobada → programada → publicada.
   - No se puede aprobar sin pasar por revisión, ni programar sin fecha, ni pedir cambios sin nota.
   - Si cambias el texto de una versión aprobada, vuelve a borrador.
 - Historial de cada cambio de estado; botón "Copiar texto y abrir [red]".
-- Respaldo: `GET /api/v1/export` (JSON).
+- **Papelera:** "Mover a la papelera" es reversible; se restaura o se elimina para siempre desde Ajustes.
+- **Ajustes:** zona horaria (por defecto America/New_York) y primer día de la semana (por defecto domingo).
+- Respaldo: `GET /api/v1/export` (JSON), también desde Ajustes.
 
 **Fuera del prototipo:** biblioteca de enlaces, perfil completo de marca (audiencia, tono, pilares, referencias),
-arrastrar para reprogramar, roles, publicación automática, métricas.
+buscador, vista de lista, arrastrar para reprogramar, roles, publicación automática, métricas
+(incluidas las "mejores horas", que necesitan conectar las redes).
 
 ## Probarlo en tu computadora
 
@@ -38,7 +43,7 @@ npm test                              # reglas del flujo
 
 1. `npx wrangler d1 create brancode-social-studio` y pega el `database_id` en `wrangler.jsonc`.
 2. `npm run db:migrate:remote` y `npm run db:seed:brands:remote`.
-3. `npm run deploy`.
+3. `npm run deploy`. (Si la base ya existe, aplica también las migraciones nuevas con `npm run db:migrate:remote`.)
 4. En Cloudflare, agrega `social.brancode.io` como dominio personalizado del Worker `brancode-social-studio`.
 5. Protege el acceso (Zero Trust → Access → Applications → Self-hosted) para `social.brancode.io`
    con una política que permita solo tu correo.
@@ -57,6 +62,7 @@ expuestos por error. Desactiva también el dominio `workers.dev` del Worker.
 
 ## Notas
 
-- Las fechas de publicación se guardan como hora local sin zona horaria (`2026-11-25T10:00`).
+- Las fechas de publicación se guardan como hora local sin zona horaria (`2026-11-25T10:00`). La zona horaria de
+  Ajustes define qué día es "hoy" y se muestra en el editor; cambiarla no convierte las horas ya guardadas.
 - Los enlaces de "Abrir en [red]" apuntan a la página de creación de cada red y están por confirmar
   (`NETWORK_URL` en `src/components/PostEditor.tsx`).

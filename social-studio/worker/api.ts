@@ -41,6 +41,7 @@ interface PostRow {
 	external_ref: string | null;
 	created_at: string;
 	updated_at: string;
+	deleted_at: string | null;
 }
 interface VersionRow {
 	id: string;
@@ -150,10 +151,17 @@ const eventStmt = (env: Env, type: string, entityId: string, payload: unknown) =
 		JSON.stringify(payload),
 	);
 
-async function loadPosts(env: Env, opts: { brandId?: string; postId?: string }) {
-	const arg = opts.postId ?? opts.brandId;
-	const where = opts.postId ? "WHERE p.id = ?1" : opts.brandId ? "WHERE p.brand_id = ?1" : "";
-	const prep = (sql: string) => (arg !== undefined ? env.DB.prepare(sql).bind(arg) : env.DB.prepare(sql));
+async function loadPosts(env: Env, opts: { brandId?: string; postId?: string; deleted?: boolean }) {
+	const conds: string[] = [];
+	const args: string[] = [];
+	if (opts.postId) {
+		conds.push(`p.id = ?${args.push(opts.postId)}`);
+	} else {
+		if (opts.brandId) conds.push(`p.brand_id = ?${args.push(opts.brandId)}`);
+		conds.push(opts.deleted ? "p.deleted_at IS NOT NULL" : "p.deleted_at IS NULL");
+	}
+	const where = conds.length ? `WHERE ${conds.join(" AND ")}` : "";
+	const prep = (sql: string) => env.DB.prepare(sql).bind(...args);
 
 	const [posts, versions] = await Promise.all([
 		prep(`SELECT p.* FROM posts p ${where} ORDER BY p.updated_at DESC LIMIT 500`).all<PostRow>(),
@@ -189,6 +197,11 @@ async function requireBrand(env: Env, id: string): Promise<BrandRow> {
 	const b = await env.DB.prepare("SELECT * FROM brands WHERE id = ?1 AND archived = 0").bind(id).first<BrandRow>();
 	if (!b) throw new HttpError(404, "La marca no existe.");
 	return b;
+}
+
+async function assertActive(env: Env, postId: string) {
+	const row = await env.DB.prepare("SELECT deleted_at FROM posts WHERE id = ?1").bind(postId).first<{ deleted_at: string | null }>();
+	if (row?.deleted_at) throw new HttpError(409, "La publicación está en la papelera. Restáurala para editarla.");
 }
 
 const routes: { method: string; re: RegExp; names: string[]; handler: Handler }[] = [];
@@ -245,7 +258,7 @@ route("PATCH", "/api/v1/brands/:id", async ({ env, req, params }) => {
 // ---------- Publicaciones ----------
 route("GET", "/api/v1/posts", async ({ env, query }) => {
 	const brandId = query.get("brand_id") ?? undefined;
-	return json(await loadPosts(env, { brandId }));
+	return json(await loadPosts(env, { brandId, deleted: query.get("deleted") === "1" }));
 });
 
 route("GET", "/api/v1/posts/:id", async ({ env, params }) => {
@@ -294,6 +307,7 @@ route("POST", "/api/v1/posts", async ({ env, req, user }) => {
 });
 
 route("PATCH", "/api/v1/posts/:id", async ({ env, req, params }) => {
+	await assertActive(env, params.id);
 	const b = await readBody(req);
 	const title = str(b.title, "title", 200);
 	if (title === "") throw new HttpError(400, "El título no puede estar vacío.");
@@ -310,9 +324,24 @@ route("PATCH", "/api/v1/posts/:id", async ({ env, req, params }) => {
 	return json(post);
 });
 
-route("DELETE", "/api/v1/posts/:id", async ({ env, params, user }) => {
-	const post = await env.DB.prepare("SELECT id, title FROM posts WHERE id = ?1").bind(params.id).first<PostRow>();
+// Sin ?permanent=1 la publicación va a la papelera (se puede restaurar).
+// Con ?permanent=1 solo se borra si ya estaba en la papelera.
+route("DELETE", "/api/v1/posts/:id", async ({ env, params, user, query }) => {
+	const post = await env.DB.prepare("SELECT id, title, deleted_at FROM posts WHERE id = ?1")
+		.bind(params.id)
+		.first<PostRow>();
 	if (!post) throw new HttpError(404, "La publicación no existe.");
+
+	if (query.get("permanent") !== "1") {
+		if (post.deleted_at) return json({ ok: true });
+		await env.DB.batch([
+			env.DB.prepare("UPDATE posts SET deleted_at = datetime('now') WHERE id = ?1").bind(params.id),
+			eventStmt(env, "post.trashed", params.id, { title: post.title, by: user }),
+		]);
+		return json({ ok: true });
+	}
+
+	if (!post.deleted_at) throw new HttpError(409, "Primero muévela a la papelera.");
 	await env.DB.batch([
 		env.DB.prepare(
 			"DELETE FROM status_history WHERE version_id IN (SELECT id FROM post_versions WHERE post_id = ?1)",
@@ -324,11 +353,24 @@ route("DELETE", "/api/v1/posts/:id", async ({ env, params, user }) => {
 	return json({ ok: true });
 });
 
+route("POST", "/api/v1/posts/:id/restore", async ({ env, params, user }) => {
+	const res = await env.DB.prepare(
+		"UPDATE posts SET deleted_at = NULL, updated_at = datetime('now') WHERE id = ?1 AND deleted_at IS NOT NULL",
+	)
+		.bind(params.id)
+		.run();
+	if (!res.meta.changes) throw new HttpError(404, "No hay una publicación en la papelera con ese id.");
+	await eventStmt(env, "post.restored", params.id, { by: user }).run();
+	const [post] = await loadPosts(env, { postId: params.id });
+	return json(post);
+});
+
 route("POST", "/api/v1/posts/:id/networks", async ({ env, req, params, user }) => {
 	const b = await readBody(req);
 	if (!isNetwork(b.network)) throw new HttpError(400, "Red no válida.");
 	const exists = await env.DB.prepare("SELECT id FROM posts WHERE id = ?1").bind(params.id).first();
 	if (!exists) throw new HttpError(404, "La publicación no existe.");
+	await assertActive(env, params.id);
 	const dup = await env.DB.prepare("SELECT id FROM post_versions WHERE post_id = ?1 AND network = ?2")
 		.bind(params.id, b.network)
 		.first();
@@ -349,6 +391,7 @@ route("POST", "/api/v1/posts/:id/networks", async ({ env, req, params, user }) =
 route("PATCH", "/api/v1/versions/:id", async ({ env, req, params, user }) => {
 	const v = await env.DB.prepare("SELECT * FROM post_versions WHERE id = ?1").bind(params.id).first<VersionRow>();
 	if (!v) throw new HttpError(404, "La versión no existe.");
+	await assertActive(env, v.post_id);
 	const b = await readBody(req);
 	const copy = longText(b.copy, "copy", 5000);
 	const hashtags = str(b.hashtags, "hashtags", 500);
@@ -396,6 +439,7 @@ route("PATCH", "/api/v1/versions/:id", async ({ env, req, params, user }) => {
 route("POST", "/api/v1/versions/:id/transition", async ({ env, req, params, user }) => {
 	const v = await env.DB.prepare("SELECT * FROM post_versions WHERE id = ?1").bind(params.id).first<VersionRow>();
 	if (!v) throw new HttpError(404, "La versión no existe.");
+	await assertActive(env, v.post_id);
 	const b = await readBody(req);
 	if (!isStatus(b.to)) throw new HttpError(400, "Estado no válido.");
 	const to = b.to;
@@ -426,6 +470,43 @@ route("POST", "/api/v1/versions/:id/transition", async ({ env, req, params, user
 	return json(row);
 });
 
+// ---------- Ajustes ----------
+const WEEK_STARTS = ["sunday", "monday"] as const;
+const DEFAULT_SETTINGS = { timezone: "America/New_York", week_start: "sunday" };
+
+async function loadSettings(env: Env) {
+	const rows = await env.DB.prepare("SELECT key, value FROM settings").all<{ key: string; value: string }>();
+	const out: Record<string, string> = { ...DEFAULT_SETTINGS };
+	for (const r of rows.results) out[r.key] = r.value;
+	return out;
+}
+
+route("GET", "/api/v1/settings", async ({ env }) => json(await loadSettings(env)));
+
+route("PUT", "/api/v1/settings", async ({ env, req }) => {
+	const b = await readBody(req);
+	const timezone = str(b.timezone, "timezone", 64);
+	if (timezone !== undefined) {
+		try {
+			if (!/^[A-Za-z0-9_+\-/]+$/.test(timezone)) throw new Error("formato");
+			new Intl.DateTimeFormat("en-US", { timeZone: timezone });
+		} catch {
+			throw new HttpError(400, "Zona horaria no válida.");
+		}
+	}
+	const weekStart = str(b.week_start, "week_start", 10);
+	if (weekStart !== undefined && !(WEEK_STARTS as readonly string[]).includes(weekStart)) {
+		throw new HttpError(400, "Primer día de la semana no válido.");
+	}
+	const upsert = (k: string, v: string) =>
+		env.DB.prepare("INSERT INTO settings (key, value) VALUES (?1, ?2) ON CONFLICT(key) DO UPDATE SET value = ?2").bind(k, v);
+	const stmts = [];
+	if (timezone) stmts.push(upsert("timezone", timezone));
+	if (weekStart) stmts.push(upsert("week_start", weekStart));
+	if (stmts.length) await env.DB.batch(stmts);
+	return json(await loadSettings(env));
+});
+
 // ---------- Respaldo ----------
 route("GET", "/api/v1/export", async ({ env }) => {
 	const all = async (t: string) => (await env.DB.prepare(`SELECT * FROM ${t}`).all()).results;
@@ -435,6 +516,7 @@ route("GET", "/api/v1/export", async ({ env }) => {
 		posts: await all("posts"),
 		post_versions: await all("post_versions"),
 		status_history: await all("status_history"),
+		settings: await all("settings"),
 	};
 	return new Response(JSON.stringify(data, null, 2), {
 		headers: {

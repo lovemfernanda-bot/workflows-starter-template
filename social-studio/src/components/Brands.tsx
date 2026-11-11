@@ -103,11 +103,6 @@ export default function Brands({ brands, onChanged }: { brands: Brand[]; onChang
 					}}
 				/>
 			</div>
-			<p className="muted">
-				<a href="/api/v1/export" download>
-					Descargar respaldo de todos mis datos (JSON)
-				</a>
-			</p>
 		</section>
 	);
 }
