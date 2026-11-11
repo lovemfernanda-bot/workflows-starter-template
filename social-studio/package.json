@@ -1,0 +1,34 @@
+{
+	"name": "brancode-social-studio",
+	"private": true,
+	"version": "0.1.0",
+	"description": "Prototipo de BranCode Social Studio: marcas, calendario, estados y revisión",
+	"type": "module",
+	"scripts": {
+		"dev": "vite",
+		"build": "tsc -b && vite build",
+		"typecheck": "tsc -b",
+		"test": "vitest run",
+		"db:migrate:local": "wrangler d1 migrations apply DB --local",
+		"db:seed:brands:local": "wrangler d1 execute DB --local --file=seed/brands.sql",
+		"db:seed:demo:local": "wrangler d1 execute DB --local --file=seed/demo.sql",
+		"db:migrate:remote": "wrangler d1 migrations apply DB --remote",
+		"db:seed:brands:remote": "wrangler d1 execute DB --remote --file=seed/brands.sql",
+		"deploy": "npm run build && wrangler deploy"
+	},
+	"dependencies": {
+		"react": "^19.1.2",
+		"react-dom": "^19.1.2"
+	},
+	"devDependencies": {
+		"@cloudflare/vite-plugin": "^1.15.3",
+		"@cloudflare/workers-types": "^5.20261110.1",
+		"@types/react": "^19.1.10",
+		"@types/react-dom": "^19.1.7",
+		"@vitejs/plugin-react-swc": "^4.0.0",
+		"typescript": "~5.8.3",
+		"vite": "^7.1.2",
+		"vitest": "3.2.x",
+		"wrangler": "^4.51.0"
+	}
+}

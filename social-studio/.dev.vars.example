@@ -1,0 +1,2 @@
+# Copia a .dev.vars para desarrollo local (sin Cloudflare Access)
+ENVIRONMENT=development
